@@ -3,7 +3,7 @@
 """I lorenz example """
 import os
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 import numpy
 import scipy.stats as stats
 from scipy.integrate import solve_ivp
@@ -11,16 +11,16 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # load lorenz sequence from R
-fpath = os.getcwd() + '/data/lorData.txt'
+fpath = os.getcwd() + '/data/lorenzdata/lorData.txt'
 lorData = numpy.loadtxt(fpath, comments="#", delimiter=",", skiprows=1)
 x = lorData[:, 1]
 y = lorData[:, 2]
 z = lorData[:, 3]
 
 # # # plot
-xyzs = numpy.array((x,y,z))
-ax = plt.figure().add_subplot(projection='3d')
-ax.plot(*xyzs, lw=0.5)
+# xyzs = numpy.array((x,y,z))
+# ax = plt.figure().add_subplot(projection='3d')
+# ax.plot(*xyzs, lw=0.5)
 
 # ---- AMI ----- #
 import teaspoon.parameter_selection.MI_delay as AMI
