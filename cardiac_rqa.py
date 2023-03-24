@@ -1,37 +1,86 @@
 import read_cardiac as rc
 import numpy
-import matplotlib.pyplot as plt
 from pathlib import Path
 import os
-# RQA parameter selection
-import teaspoon.parameter_selection.MI_delay as AMI  # average mutual information --> delay (d)
-import teaspoon.parameter_selection.FNN_n as FNN  # false nearest neighbours --> embedding dimension (m)
-# RQA analysis
-
 import scipy.stats as stats
-from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+numpy.seterr(divide='ignore', invalid='ignore')  # ignore zero divide
 
-# subject id
-subject_id = '1010'
+# RQA analysis
+from pyrqa.settings import Settings
+from pyrqa.time_series import TimeSeries
+from pyrqa.neighbourhood import FixedRadius
+from pyrqa.metric import EuclideanMetric
+
 
 # connect to server and mount project folder
 os.system("osascript -e 'mount volume \"smb://m40.cfi-asl.mcgill.ca/spl-projects/pain\"'")
-path = Path('/Volumes/pain')
-csv_path = path / 'info_summary_python_readable.csv'
+data_path = Path('/Volumes/pain/CardiacData')
+csv_path = Path('/Volumes/pain/info_summary_python_readable.csv')
+conditions = ['SPR', 'B1', 'B2', 'SC', 'T1', 'T2', 'T3']
+subject_ids = rc.get_subject_ids(csv_path)[5:-1]  # some files are missing
 
-# read RR data
-rr_data = numpy.loadtxt(path / 'CardiacData' / f'{subject_id}.txt').astype(int)
-# convert to HR
-data = rc.rr2bpm(rr_data, window_size=500, resamp_rate=2)
+metric = 'rr'  # can be 'bpm' or 'rr'
+rqa_settings = Settings(TimeSeries(()), analysis_type='Classic', similarity_measure=EuclideanMetric)  # RQA settings
+plot = False
 
-# bin data to conditions
-data = rc.bin_data(data, csv_path, subject_id)
+# iterate across subjects, return data dictionary containing cardiac data, rqa parameters and rqa results
+data = dict()
+for s_id in subject_ids:
+    subj_dict = numpy.loadtxt(data_path / f'{s_id}.txt').astype(int)  # read raw subject rr data
+    subj_dict = rc.rr2bpm(subj_dict, resamp_rate=2)  # calculate HR
+    subj_dict = rc.bin_data(subj_dict, s_id, csv_path, conditions)  # bin data to conditions
+    subj_dict['metric'] = metric
+    subj_dict['rqa_params']['delay'], subj_dict['rqa_params']['embedding'] = rc.rqa_params(subj_dict)
+    subj_dict['rqa_params']['settings'] = rqa_settings  # create settings key in subject dictionary
+    subj_dict = rc.zscore(subj_dict)  # z-score
+    subj_dict['rqa_params']['settings'].neighbourhood = FixedRadius(rc.estimate_radius(subj_dict,
+                                    r_start=.1, r_step=.05, rr_lower=.1, rr_upper=.15))  # set radius
+    subj_dict = rc.apply_rqa(subj_dict)  # get rqa results with selected parameters
+    data[s_id] = subj_dict  # append subject data to grand dataset
 
-# select measurement
-B1 = data['B1'].bpm
-B1 = data['B1'].rr
+# bar graphs
+for s_id in subject_ids:
+    subj_dict = data[s_id]
+    fig, axis = plt.subplots(1, 1)
+    rrs = []
+    labels = []
+    for c in subj_dict['conditions']:
+        rrs.append(subj_dict[c]['rqa_result'].recurrence_rate)
+        labels.append(c)
+    axis.bar(range(len(rrs)), rrs, color='grey', tick_label=labels)
+    axis.set_ylabel('%Recurrence')
+    axis.set_xlabel('Condition')
 
-# parameter selection
-d = AMI.MI_for_delay(B1, plotting=True, method='kraskov 1', h_method='sqrt', k=2, ranking=True)
-m =
+#
+
+# m and d is averaged for each participant
+# % DET for each condition:
+# r is chosen, so that RR is within (10-15%)
+
+
+
+"""
+
+
+# # plot
+# fig, ax = plt.subplots()
+# mat = ax.imshow(rm, cmap='Greys')
+# ax.invert_yaxis()
+# plt.xlabel('Time')
+# plt.ylabel('Time')
+
+
+# plot
+sub = '1010'
+condition = 'T1'
+d = data[sub]['d']
+dat = data[sub][condition].bpm
+x = dat[:-2*d]
+y = dat[d:-d]
+z = dat[2*d:]
+xyzs = numpy.array((x, y, z))
+ax = plt.figure().add_subplot(projection='3d')
+ax.plot(*xyzs, lw=0.5)
+"""

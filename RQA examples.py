@@ -66,7 +66,9 @@ CRQA_computation = RQAComputation.create(settings, verbose=True)
 CRQA_result = CRQA_computation.run()
 print(CRQA_result)
 
-# run CRP
+
+
+# create RP
 from pyrqa.computation import RPComputation
 RP_computation = RPComputation.create(settings)
 CRP_result = RP_computation.run()
