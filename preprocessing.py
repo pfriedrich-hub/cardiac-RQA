@@ -92,6 +92,7 @@ def bin_data(data, subject_id, csv_path, conditions, test_keys):
     subj_dict['id'] = subject_id
     subj_dict['conditions'] = conditions[0]
     subj_dict['rqa_params'] = dict()
+    subj_dict['rqa_params']['z-scored'] = False
     return subj_dict
 
 def zscore(subj_dict):
