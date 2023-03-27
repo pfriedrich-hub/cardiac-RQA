@@ -60,6 +60,10 @@ def cardiac(cardiac_data, metric='rr', axis=None):
         axis.set_ylabel('Local BPM')
 
 def rqa_results(subj_dict, conditions, axis=None):
+    if not axis:
+        fig, axes = plt.subplots(int(len(conditions) / 2), 2, figsize=(7.6, 7.6))
+    fig.suptitle(f"ID: {subj_dict['id']}")
+
     # bar graphs
     fig, axis = plt.subplots(3, 1)
     rrs = []
