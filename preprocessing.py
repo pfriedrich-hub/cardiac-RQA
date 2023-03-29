@@ -19,7 +19,7 @@ def rr2bpm(rr_data, resamp_rate):
     Returns:
     (named tuple): (BPM, RR, time points)
     """
-    data = namedtuple('data', 'rr' 'bpm' 'bpm_time')
+    data = namedtuple('data', 'rr' 'bpm' 'bpm_time' 'rr_time')
     window_size = int(1 / resamp_rate * 1000)  # convert sampling rate (Hz) to resampling interval (ms)
     time_pts = rr_data.sum()  # time points in ms
     temp_data = numpy.zeros(time_pts)
@@ -49,14 +49,13 @@ def bin_data(data, subject_id, csv_path, conditions, test_keys):
     """
     subj_csv = pd.read_csv(csv_path, sep=';', on_bad_lines='skip')
     subj_data = subj_csv[subj_csv['Participants No.'] == int(subject_id)]
-    subj_dict = {'t_stamp': dict(subj_data.iloc[0, 12:26])}
+    subj_dict = {'t_stamp': subj_data.iloc[0, 12:26]}
     for key in subj_dict['t_stamp'].keys():  # convert time stamps to ms
         subj_dict['t_stamp'][key] = \
             sum(int(x) * 60 ** i for i, x in enumerate(reversed(subj_dict['t_stamp'][key].split(':'))))
         subj_dict['t_stamp'][key] *= 1000
     cardiac_data = namedtuple('cardiac_data', 'bpm_time bpm rr_time rr rqa rp')
     subj_dict['raw'] = cardiac_data(data.bpm_time, data.bpm, data.rr_time, data.rr, None, None)
-    test_conditions = dict(zip(conditions[1], [[], [], [], []]))  # dictionary to hold test conditions T1-T3 music/pain
     for condition in conditions[0]:
         bpm_time = data.bpm_time[numpy.logical_and(data.bpm_time >= subj_dict['t_stamp'][condition + '_start'],
                                                 data.bpm_time <= subj_dict['t_stamp'][condition + '_end'])]
@@ -75,22 +74,13 @@ def bin_data(data, subject_id, csv_path, conditions, test_keys):
             rr_times = [time_arr - time_arr.min() for time_arr in rr_times]
             test_data = numpy.array((bpm_times, numpy.array_split(bpm, 4),
                                      rr_times, numpy.array_split(rr, 4)), dtype='object')
-            for key in test_keys[condition]:
-                idx = test_keys[condition] == key
-                test_conditions[conditions[1][key]].append(test_data[:, idx])  # get cardiac data for pain/music condition
+            for idx, key in enumerate(test_keys[condition]):     # get cardiac data for pain/music condition
+                subj_dict[condition + conditions[1][key]]= (cardiac_data(test_data[0, idx], test_data[1, idx],
+                                                        test_data[2, idx], test_data[3, idx], None, None))
         subj_dict[condition] = cardiac_data(bpm_time, bpm, rr_time, rr, None, None)  # save cardiac data for main conditions
-    for key in conditions[1]:  # fetch time series across T1,T2,T3 for each pain / music condition
-        data = numpy.concatenate(numpy.asarray(test_conditions[key]), axis=1)
-        subc_data = []
-        for i in range(4):  # create single time series across T1,T2,T3 for each measure bpm_time, bpm, rr_time, rr
-            if i == 0 or i == 2:  # add-up times to continuous series across T1 T2 T3
-                data[i][1] += data[i][0].max() + numpy.diff(data[i][0]).mean()  # stitch times
-                data[i][2] += data[i][1].max() + numpy.diff(data[i][1]).mean()
-            subc_data.append(numpy.concatenate(data[i]))
-        subj_dict[key] = cardiac_data(subc_data[0], subc_data[1], subc_data[2], subc_data[3], None, None)
     del subj_dict['t_stamp']  # remove time stamp data from dataset
     subj_dict['id'] = subject_id
-    subj_dict['conditions'] = conditions[0]
+    subj_dict['conditions'] = conditions
     subj_dict['rqa_params'] = dict()
     subj_dict['rqa_params']['z-scored'] = False
     return subj_dict
@@ -145,3 +135,15 @@ def rr2bpm_dev(rr_data, method='windowed', window_size=1000, rescale=True, resam
         axis.set_ylabel('Local BPM')
     return hr_data
 
+
+    # # create single time series across T1,T2,T3 for each measure bpm_time, bpm, rr_time, rr
+    # for key in conditions[1]:  # fetch time series across T1,T2,T3 for each pain / music condition
+    #     data = numpy.concatenate(numpy.asarray(test_conditions[key]), axis=1)
+    #     subc_data = []
+    #     for i in range(4):
+    #         if i == 0 or i == 2:  # add-up times to continuous series across T1 T2 T3
+    #             data[i][1] += data[i][0].max() + numpy.diff(data[i][0]).mean()  # stitch times
+    #             data[i][2] += data[i][1].max() + numpy.diff(data[i][1]).mean()
+    #         subc_data.append(numpy.concatenate(data[i]))
+    #     subj_dict[key] = cardiac_data(subc_data[0], subc_data[1], subc_data[2], subc_data[3], None, None)
+    #     subj_dict[key] = cardiac_data(subc_data[0], subc_data[1], subc_data[2], subc_data[3], None, None)

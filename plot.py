@@ -33,6 +33,12 @@ def rp(subj_dict, conditions, axis=None):
         ax.set_yticks(idx, times)
     return axes
 
+def rp(recurrence_matrix, axis=None):
+    if not axis:
+        fig, axis = plt.subplots()
+    axis.imshow(recurrence_matrix, cmap='Greys')
+    axis.invert_yaxis()
+
 def cardiac_condition(subj_dict, conditions, metric, axis=None):
     if not axis:
         fig, axis = plt.subplots(len(conditions), figsize=(12, 8))
@@ -59,34 +65,32 @@ def cardiac(cardiac_data, metric='rr', axis=None):
     elif metric == 'bpm':
         axis.set_ylabel('Local BPM')
 
-def rqa_results(subj_dict, conditions, axis=None):
+def rqa_results(subj_dict, axis=None):
     if not axis:
-        fig, axes = plt.subplots(int(len(conditions) / 2), 2, figsize=(7.6, 7.6))
-    fig.suptitle(f"ID: {subj_dict['id']}")
-
-    # bar graphs
-    fig, axis = plt.subplots(3, 1)
-    rrs = []
-    dets = []
-    lams = []
-    labels = []
-    for c in subj_dict['conditions']:
-        rrs.append(subj_dict[c]['rqa_result'].recurrence_rate)
-        dets.append(subj_dict[c]['rqa_result'].determinism)
-        lams.append(subj_dict[c]['rqa_result'].laminarity)
+        fig, axes = plt.subplots(5, figsize=(7.6, 7.6))
+    fig.suptitle(f"ID: {subj_dict['id']} datatype: {subj_dict['rqa_params']['metric']}")
+    rrs, dets, lams, hrv, sdnn, labels = [], [], [], [], [], []
+    conditions = subj_dict['rqa_params']['rqa_conditions']
+    for c in conditions:
+        rrs.append(subj_dict[c].rqa.recurrence_rate)
+        dets.append(subj_dict[c].rqa.determinism)
+        lams.append(subj_dict[c].rqa.laminarity)
+        hrv.append(subj_dict[c].rr.var())
+        sdnn.append(subj_dict[c].rr.std())
         labels.append(c)
-    axis[0].bar(range(len(rrs)), rrs, color='grey', tick_label=labels)
-    axis[0].set_ylabel('%Recurrence')
-    axis[0].set_xlabel('Condition')
-    axis[0].set_title('Recurrence Rate')
-    axis[1].bar(range(len(rrs)), dets, color='grey', tick_label=labels)
-    axis[1].set_ylabel('%Determinism')
-    axis[1].set_xlabel('Condition')
-    axis[1].set_title('Determinism')
-    axis[2].bar(range(len(rrs)), lams, color='grey', tick_label=labels)
-    axis[2].set_ylabel('Laminarity')
-    axis[2].set_xlabel('Condition')
-    axis[2].set_title('Laminarity')
+    positions = [0,1,3,4,5,7,8,9,11,12,13,15,16,17]
+    labels = ['B1','B2','','p','','','pm','','','pm+','','','pm-','']
+    axes[0].bar(positions, rrs, color='grey', tick_label='')
+    axes[1].bar(positions, dets, color='grey', tick_label='')
+    axes[2].bar(positions, lams, color='grey', tick_label='')
+    # axes[4].bar(positions, hrv, color='grey', tick_label='')
+    axes[3].bar(positions, sdnn, color='grey', tick_label=labels)
+    axes[0].set_ylabel('%Recurrence')
+    axes[1].set_ylabel('%Determinism')
+    axes[2].set_ylabel('Laminarity')
+    # axes[4].set_ylabel('HRV')
+    axes[3].set_ylabel('SDNN')
+    axes[3].set_xlabel('Condition')
 
 # # connect to server and mount project folder
 # os.system("osascript -e 'mount volume \"smb://m40.cfi-asl.mcgill.ca/spl-projects/pain\"'")

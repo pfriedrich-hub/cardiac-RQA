@@ -171,3 +171,6 @@ xyzs[0] = (-13, -14, 47)  # Set initial values
 # and using them to estimate the next point
 for i in range(num_steps):
     xyzs[i + 1] = xyzs[i] + lorenz(xyzs[i]) * dt
+
+
+

@@ -16,21 +16,31 @@ def rqa_params(subj_dict, metric=None, plot=False): # parameter selection
     :param subj_dict: Dictionary containing subject data.
     :return (int): d, m
     """
-    delay = 0
-    embedding = 0
-    for condition in subj_dict['conditions']:
+    d = []
+    m = []
+    for condition in subj_dict['rqa_params']['rqa_conditions']:
         try:
             data = getattr(subj_dict[condition], subj_dict['rqa_params']['metric'])
         except:
             raise TypeError("metric must be 'rr' or 'bpm'")
-        delay += (AMI.MI_for_delay(data, plotting=plot,  # method='kraskov 1',
-                                  h_method='sqrt', k=2, ranking=True))
-        embedding += (FNN.FNN_n(ts=data, tau=delay, maxDim=50, plotting=plot)[1])
-    d = int(numpy.ceil(delay / len(subj_dict.keys())))  # mean delay parameter
-    m = int(numpy.ceil(embedding / len(subj_dict.keys())))  # mean embedding parameter
+        delay = get_delay(data, plot=plot)
+        embedding = get_embedding_dim(data, delay, plot=plot)
+        d.append(delay)
+        m.append(embedding)
+    d = int(numpy.ceil(numpy.mean(d)))  # mean delay parameter
+    m = int(numpy.ceil(numpy.mean(m)))  # mean embedding parameter
     return (d, m)
 
-def estimate_radius(subj_dict, r_start=.1, r_step=.05, rr_lo=.1, rr_up=.15, conditions='all', plot=False, axis=None):
+def get_delay(data, plot=False):
+    delay = AMI.MI_for_delay(data, plotting=plot,  # method='kraskov 1',
+                               h_method='sqrt', k=2, ranking=True)
+    return delay
+
+def get_embedding_dim(data, delay, plot=False):
+    embedding = FNN.FNN_n(ts=data, tau=delay, maxDim=50, plotting=plot)[1]
+    return embedding + 1  # add first dim, as it is not counted by FNN
+
+def estimate_radius(subj_dict, r_start=.1, r_step=.05, rr_lower=.1, rr_upper=.15, plot=False, axis=None):
     """
     Iteratively increase radius parameter until Recurrence Rates across conditions are within a specified interval.
     :param subj_dict: Dictionary containing subject data.
@@ -43,7 +53,8 @@ def estimate_radius(subj_dict, r_start=.1, r_step=.05, rr_lo=.1, rr_up=.15, cond
     :param axis (matplotlib.pyplot axis):
     :return:
     """
-    global d, m, settings  # global params for apply_rqa()
+    # global d, m, settings  # global params for apply_rqa()
+    conditions = subj_dict['rqa_params']['rqa_conditions']
     settings = subj_dict['rqa_params']['settings']
     d = subj_dict['rqa_params']['delay']
     m = subj_dict['rqa_params']['embedding']
@@ -51,37 +62,45 @@ def estimate_radius(subj_dict, r_start=.1, r_step=.05, rr_lo=.1, rr_up=.15, cond
     radius, step_size = r_start * sd, r_step * sd  # rescale radius by SD
     settings.neighbourhood = FixedRadius(radius)  # set radius to starting value
     plot_list = []
-    if conditions == 'all':
-        conditions = subj_dict['conditions']
-    if isinstance(conditions, str):
-        conditions = [conditions]
     while True:  # iterate over radii
         rrs = numpy.array(())
         for condition in conditions:  # get rr across conditions for current radius
             data = getattr(subj_dict[condition], subj_dict['rqa_params']['metric'])
-            rr = apply_rqa(data)[0].recurrence_rate
+            rr = auto_rqa(data, d, m, settings)[0].recurrence_rate
             rrs = numpy.append(rrs, rr)
         plot_list.append(numpy.append(radius, rrs))
-        if any(rrs > rr_up):  # if any rr oversteps threshold, print warning and break
-            print('overshooting in %s: \nradius: %.4f, %%REC: %s' %
-                  (numpy.array(subj_dict['conditions'])[rrs > rr_up], radius, rrs[rrs > rr_up]))
-            break
-        if not all(ele > rr_lo and ele < rr_up for ele in rrs):  # return radius if rr limits are satisfied
+
+        # ---- option I: check if all rr across conditions within limits ---- #
+        # if any(rrs > rr_up):  # if any rr oversteps threshold, print warning and break
+        #     print('overshooting in %s: \nradius: %.4f, %%REC: %s' %
+        #           (numpy.array(conditions)[rrs > rr_up], radius, rrs[rrs > rr_up]))
+        #     break
+        # if not all(ele > rr_lo and ele < rr_up for ele in rrs):  # return radius if rr limits are satisfied
+        #     radius += step_size
+        #     settings.neighbourhood = FixedRadius(radius)
+        #     continue
+
+        # -----  option II: return radius if mean rr within limits ---- #
+        if not rr_lower < numpy.median(rrs) < rr_upper:
             radius += step_size
             settings.neighbourhood = FixedRadius(radius)
             continue
         else:
             print(f'Estimated radius: {radius}')
+            if any(rrs > rr_upper):  # if any rr oversteps threshold, print warning and break
+                print('overshooting in %s: \nradius: %.4f, %%REC: %s' %
+                      (numpy.array(conditions)[rrs > rr_upper], radius, rrs[rrs > rr_upper]))
             break
     if plot:
         if not axis: fig, axis = plt.subplots(1, 1)
         plot_list = numpy.asarray(plot_list)
         for i in range(0, len(rrs)):
-            axis.plot(plot_list[:,0], plot_list[:,i+1], label=conditions[i])
+            axis.plot(plot_list[:,0], plot_list[:, i+1], label=conditions[i])
         axis.set_xlabel('radius')
         axis.set_ylabel('%REC')
         axis.legend()
-    return radius
+    subj_dict['rqa_params']['settings'].neighbourhood = FixedRadius(radius)
+    return subj_dict
 
 def subject_rqa(subj_dict):
     """
@@ -89,19 +108,20 @@ def subject_rqa(subj_dict):
     :param subj_dict:
     :return: subject dictionary containing rqa and rp results for all conditions
     """
-    global d, m, settings
+    # global d, m, settings
+    conditions = subj_dict['rqa_params']['rqa_conditions']
     d = subj_dict['rqa_params']['delay']
     m = subj_dict['rqa_params']['embedding']
     settings = subj_dict['rqa_params']['settings']
-    for key in subj_dict:
+    for key in conditions:
         if isinstance(subj_dict[key], tuple):
             data = getattr(subj_dict[key], subj_dict['rqa_params']['metric'])
-            rqa, rp = apply_rqa(data)
+            rqa, rp = auto_rqa(data, d, m, settings)
             subj_dict[key] = subj_dict[key]._replace(rqa=rqa, rp=rp)
     return subj_dict
 
-def apply_rqa(data):
-    global d, m, settings
+def auto_rqa(data, d, m, settings):
+    # global d, m, settings
     if isinstance(data, numpy.ndarray):
         data = data.tolist()
     time_series = TimeSeries(data, embedding_dimension=m, time_delay=d)
