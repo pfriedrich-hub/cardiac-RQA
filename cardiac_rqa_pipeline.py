@@ -1,4 +1,6 @@
 import preprocessing as pr
+from preprocessing import cardiac_data
+import datetime
 import rqa as rqa
 import plot
 import numpy
@@ -16,26 +18,29 @@ from pyrqa.metric import EuclideanMetric
 from pyrqa.image_generator import ImageGenerator
 
 
-
 # settings:
 rqa_conditions = ['B1', 'B2', 'T1B', 'T1O', 'T1F', 'T1S',
                   'T2B', 'T2O', 'T2F', 'T2S', 'T3B', 'T3O', 'T3F', 'T3S']
 metric = 'rr'  # can be 'bpm' or 'rr'
-zscore = False
-show_r = False  # show rr as function of radius
+zscore = True
 # radius parameters
+radius_estimation = 'fixed_rr'
 r_start = .5
-r_step = .05
+r_step = .005
+# if fixed recurrence rate
+rr_target = .05
+# if recurrence rate interval
 rr_lower = .1
 rr_upper = .15
 
 # connect to server and mount project folder
 os.system("osascript -e 'mount volume \"smb://m40.cfi-asl.mcgill.ca/spl-projects/pain\"'")
-data_path = Path('/Volumes/pain/CardiacData')
-csv_path = Path('/Volumes/pain/info_summary_python_readable.csv')
-conditions = [['SPR', 'B1', 'B2', 'SC', 'T1', 'T2', 'T3'], ['B', 'O', 'F', 'S']]
+project_path = Path('/Volumes/pain')
+data_path = project_path / 'CardiacData'
+csv_path = project_path / 'music_pain_py_readable.csv'
+conditions = [['SPR', 'B1', 'B2', 'SC', 'T1', 'T2', 'T3'], ['B', 'O', 'F', 'S']]  # 0 - B, 1 - O, 2 - F, 3 - S
 test_keys = {'T1': numpy.array((0, 1, 3, 2)), 'T2': numpy.array([2, 3, 0, 1]), 'T3': numpy.array([1, 0, 2, 3])}
-subject_ids = pr.get_subject_ids(csv_path)[5:-1]  # some files are missing
+subject_ids = pr.get_subject_ids(csv_path)[5:]  # some files are missing
 rqa_settings = Settings(TimeSeries(()), analysis_type='Classic', similarity_measure=EuclideanMetric)  # RQA settings
 
 # iterate across subjects, return data dictionary containing cardiac data, rqa parameters and rqa results
@@ -51,13 +56,15 @@ for subject_id in subject_ids:
     if zscore:
         subj_dict = pr.zscore(subj_dict)  # z-score (dont)
         subj_dict['rqa_params']['z-scored'] = True
-    subj_dict = rqa.estimate_radius(subj_dict, r_start, r_step, rr_lower, rr_upper, show_r)  # estimate radius
+    if radius_estimation == 'rr_interval':     # estimate radius for rr interval
+        subj_dict = rqa.fixed_radius_for_rr_interval(subj_dict, r_start, r_step, rr_lower, rr_upper, plot=True)
+    elif radius_estimation == 'fixed_rr':      # estimate radii for each
+        subj_dict = rqa.fixed_rr_to_radius(subj_dict, rr_target, r_start, r_step)
     subj_dict = rqa.subject_rqa(subj_dict)  # get rqa results with selected parameters
-
     data[subject_id] = subj_dict  # append subject data to grand dataset
 
 
-# Plot wrappers
+# ---- Plot results ----- #
 # select conditions[0] for main conditions, conditions[1] for test conditions
 block = 'T1'
 plot_cnd = ['B', 'O', 'F', 'S']
@@ -68,7 +75,22 @@ for subject_id in subject_ids:
     # plot.cardiac_condition(subj_dict, conditions=conditions, metric='rr')
     # # Recurrence Plots for each condition
     # plot.rp(subj_dict, conditions=plot_cnd)
-    plot.rqa_results(data[subject_id])
+    plot.rqa_results(data[subject_id], save=True)
+
+# --- save and read processed data --- #
+file_path = project_path / f'RQA_results'
+# save
+import pickle
+file_path.mkdir(parents=True, exist_ok=True)  # create subject image directory
+file_name = file_path / str('RQA_results_' + datetime.datetime.now().strftime('_%d.%m'))
+with open(file_name, 'wb') as f:  # save the newly recorded calibration
+    pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+
+# read
+file_name = file_path / str('RQA_results_' + datetime.datetime.now().strftime('_%d.%m'))
+with open(file_name, "rb") as f:
+    data = pickle.load(f)
+
 
 # go with rr - seperate into 4
 # don't resample, bc arqa

@@ -2,6 +2,7 @@ import numpy
 import pandas as pd
 from collections import namedtuple
 from scipy import stats
+cardiac_data = namedtuple('cardiac_data', 'bpm_time bpm rr_time rr rqa rp')
 
 def get_subject_ids(csv_path):
     """ Get subject ids from csv """
@@ -49,12 +50,12 @@ def bin_data(data, subject_id, csv_path, conditions, test_keys):
     """
     subj_csv = pd.read_csv(csv_path, sep=';', on_bad_lines='skip')
     subj_data = subj_csv[subj_csv['Participants No.'] == int(subject_id)]
-    subj_dict = {'t_stamp': subj_data.iloc[0, 12:26]}
+    subj_dict = {'t_stamp': subj_data.iloc[0, 13:27]}
     for key in subj_dict['t_stamp'].keys():  # convert time stamps to ms
         subj_dict['t_stamp'][key] = \
             sum(int(x) * 60 ** i for i, x in enumerate(reversed(subj_dict['t_stamp'][key].split(':'))))
         subj_dict['t_stamp'][key] *= 1000
-    cardiac_data = namedtuple('cardiac_data', 'bpm_time bpm rr_time rr rqa rp')
+    # cardiac_data = namedtuple('cardiac_data', 'bpm_time bpm rr_time rr rqa rp')
     subj_dict['raw'] = cardiac_data(data.bpm_time, data.bpm, data.rr_time, data.rr, None, None)
     for condition in conditions[0]:
         bpm_time = data.bpm_time[numpy.logical_and(data.bpm_time >= subj_dict['t_stamp'][condition + '_start'],
@@ -91,6 +92,7 @@ def zscore(subj_dict):
             subj_dict[key] = subj_dict[key]._replace(bpm=stats.zscore(subj_dict[key].bpm))
             subj_dict[key] = subj_dict[key]._replace(rr=stats.zscore(subj_dict[key].rr))
     return subj_dict
+
 
 # --- convenience functions and dev ----#
 def read_cardiac(data_path, csv_path, conditions, s_id, resamp_rate):

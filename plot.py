@@ -1,6 +1,7 @@
 import numpy
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from pathlib import Path
+import datetime
 numpy.seterr(divide='ignore', invalid='ignore')  # ignore zero divide
 
 def rp(subj_dict, conditions, axis=None):
@@ -65,9 +66,9 @@ def cardiac(cardiac_data, metric='rr', axis=None):
     elif metric == 'bpm':
         axis.set_ylabel('Local BPM')
 
-def rqa_results(subj_dict, axis=None):
+def rqa_results(subj_dict, axis=None, save=False):
     if not axis:
-        fig, axes = plt.subplots(5, figsize=(7.6, 7.6))
+        fig, axes = plt.subplots(3, figsize=(7.6, 7.6))
     fig.suptitle(f"ID: {subj_dict['id']} datatype: {subj_dict['rqa_params']['metric']}")
     rrs, dets, lams, hrv, sdnn, labels = [], [], [], [], [], []
     conditions = subj_dict['rqa_params']['rqa_conditions']
@@ -82,15 +83,20 @@ def rqa_results(subj_dict, axis=None):
     labels = ['B1','B2','','p','','','pm','','','pm+','','','pm-','']
     axes[0].bar(positions, rrs, color='grey', tick_label='')
     axes[1].bar(positions, dets, color='grey', tick_label='')
-    axes[2].bar(positions, lams, color='grey', tick_label='')
+    axes[2].bar(positions, lams, color='grey', tick_label=labels)
     # axes[4].bar(positions, hrv, color='grey', tick_label='')
-    axes[3].bar(positions, sdnn, color='grey', tick_label=labels)
+    # axes[3].bar(positions, sdnn, color='grey', tick_label=labels)
     axes[0].set_ylabel('%Recurrence')
     axes[1].set_ylabel('%Determinism')
     axes[2].set_ylabel('Laminarity')
     # axes[4].set_ylabel('HRV')
-    axes[3].set_ylabel('SDNN')
-    axes[3].set_xlabel('Condition')
+    # axes[3].set_ylabel('SDNN')
+    # axes[3].set_xlabel('Condition')
+    if save:
+        (Path.cwd() / 'images').mkdir(parents=True, exist_ok=True)  # create subject image directory
+        fig.savefig(Path.cwd() / 'images' / str('RQA_results_' + subj_dict['id']
+                                        + datetime.datetime.now().strftime('_%d.%m') + '.png'), format='png')  # save image
+        plt.close()
 
 # # connect to server and mount project folder
 # os.system("osascript -e 'mount volume \"smb://m40.cfi-asl.mcgill.ca/spl-projects/pain\"'")
