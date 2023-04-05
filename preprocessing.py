@@ -93,6 +93,18 @@ def zscore(subj_dict):
             subj_dict[key] = subj_dict[key]._replace(rr=stats.zscore(subj_dict[key].rr))
     return subj_dict
 
+def set_grand_mean_rqa_params(data):
+    d = []
+    m = []
+    for subject_data in data.values():  # mean delay and embedding parameters across subjects
+        d.append(subject_data['rqa_params']['delay'])
+        m.append(subject_data['rqa_params']['embedding'])
+    d = int(numpy.ceil(numpy.mean(d)))
+    m = int(numpy.ceil(numpy.mean(m)))
+    for subject_id in data.keys():  # set parameter to mean value for all subjects
+        data[subject_id]['rqa_params']['delay'] = d
+        data[subject_id]['rqa_params']['embedding'] = m
+    return data
 
 # --- convenience functions and dev ----#
 def read_cardiac(data_path, csv_path, conditions, s_id, resamp_rate):

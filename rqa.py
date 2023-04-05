@@ -170,3 +170,4 @@ def auto_rqa(data, d, m, settings):
     rp_computation = RPComputation.create(settings)
     rp = rp_computation.run()
     return rqa_result, rp
+

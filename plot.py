@@ -70,7 +70,7 @@ def rqa_results(subj_dict, axis=None, save=False):
     if not axis:
         fig, axes = plt.subplots(3, figsize=(7.6, 7.6))
     fig.suptitle(f"ID: {subj_dict['id']} datatype: {subj_dict['rqa_params']['metric']}")
-    rrs, dets, lams, hrv, sdnn, labels = [], [], [], [], [], []
+    rrs, dets, lams, hrv, sdnn, labels, radii = [], [], [], [], [], [], []
     conditions = subj_dict['rqa_params']['rqa_conditions']
     for c in conditions:
         rrs.append(subj_dict[c].rqa.recurrence_rate)
@@ -78,15 +78,17 @@ def rqa_results(subj_dict, axis=None, save=False):
         lams.append(subj_dict[c].rqa.laminarity)
         hrv.append(subj_dict[c].rr.var())
         sdnn.append(subj_dict[c].rr.std())
+        radii.append(subj_dict['rqa_params']['radii'][c])
         labels.append(c)
     positions = [0,1,3,4,5,7,8,9,11,12,13,15,16,17]
     labels = ['B1','B2','','p','','','pm','','','pm+','','','pm-','']
-    axes[0].bar(positions, rrs, color='grey', tick_label='')
+    axes[0].bar(positions, radii, color='grey', tick_label='')
+    axes[0].bar(positions, rrs, color='black', tick_label='')
     axes[1].bar(positions, dets, color='grey', tick_label='')
     axes[2].bar(positions, lams, color='grey', tick_label=labels)
     # axes[4].bar(positions, hrv, color='grey', tick_label='')
     # axes[3].bar(positions, sdnn, color='grey', tick_label=labels)
-    axes[0].set_ylabel('%Recurrence')
+    axes[0].set_ylabel('%Recurrence / radius')
     axes[1].set_ylabel('%Determinism')
     axes[2].set_ylabel('Laminarity')
     # axes[4].set_ylabel('HRV')
