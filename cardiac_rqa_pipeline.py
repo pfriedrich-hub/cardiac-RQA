@@ -10,7 +10,7 @@ numpy.seterr(divide='ignore', invalid='ignore')  # ignore zero divide
 os.system("osascript -e 'mount volume \"smb://m40.cfi-asl.mcgill.ca/spl-projects/pain\"'")
 project_path = Path('/Volumes/pain')
 data_path = project_path / 'CardiacData'
-csv_path = project_path / 'music_pain_py_readable.csv'
+csv_path = project_path / 'Analysis' / 'music_pain_py_readable.csv'
 
 """ --- analysis settings: ---- """
 rqa_conditions = ['B1', 'B2', 'T1B', 'T1O', 'T1F', 'T1S',  # conditions considered for rqa analysis
@@ -29,7 +29,8 @@ rr_lower, rr_upper = .1, .15  # set recurrence rate interval, applied if radius 
 #  experiment settings
 conditions = [['SPR', 'B1', 'B2', 'SC', 'T1', 'T2', 'T3'], ['B', 'O', 'F', 'S']]  # 0 - B, 1 - O, 2 - F, 3 - S
 test_keys = {'T1': numpy.array((0, 1, 3, 2)), 'T2': numpy.array([2, 3, 0, 1]), 'T3': numpy.array([1, 0, 2, 3])}
-rqa_settings = Settings(TimeSeries(()), analysis_type='Classic', similarity_measure=EuclideanMetric)  # RQA settings
+# RQA settings
+rqa_settings = Settings(TimeSeries(()), analysis_type='Classic', similarity_measure=EuclideanMetric, theiler_corrector=1)
 
 """ --- Preprocessing ---
 - iterate across subjects and return data dictionary containing cardiac data and rqa parameters 
@@ -64,15 +65,14 @@ for subject_id in subject_ids:
 
 """ --- save and read processed data --- """
 # save
-result_path = project_path / f'RQA_results'
+result_path = project_path / 'Analysis' / f'pyRQA_results'
 result_path.mkdir(parents=True, exist_ok=True)  # create subject image directory
-file_path = result_path / str('RQA_results' + datetime.datetime.now().strftime('_%d.%m'))
+file_path = result_path / str('RQA_results' + datetime.datetime.now().strftime('_%d.%m') + '.pkl')
 with open(file_path, 'wb') as f:  # save the newly recorded calibration
     pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 # read
-result_path = project_path / f'RQA_results'
-file_path = result_path / str('RQA_results' + datetime.datetime.now().strftime('_%d.%m'))
-file_path = result_path / 'RQA_results_05.04'
+result_path = project_path / 'Analysis' / f'pyRQA_results'
+file_path = result_path / 'RQA_results_05.04.pkl'
 with open(file_path, "rb") as f:
     data = pickle.load(f)
 
